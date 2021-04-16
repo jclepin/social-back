@@ -48,6 +48,8 @@ app.use((err, req, rep, next) => {
   err ? rep.status(err.status).json({ error: err.message }) : next();
 });
 
+app.get("/", (req, res) => res.json({ Error: "GET not valid" }));
+
 app.post("/login", async (req, rep) => {
   const { login, password } = req.body;
 

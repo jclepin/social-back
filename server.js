@@ -40,7 +40,7 @@ app.use(
     secret: process.env.JWT_SECRET,
     algorithms: ["HS256"],
   }).unless({
-    path: ["/posts", "/users", "/login"],
+    path: ["/", "/posts", "/users", "/login"],
   })
 );
 

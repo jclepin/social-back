@@ -98,4 +98,5 @@ app.get("/users", async (req, res) => {
 //   .then(() =>
 //     app.listen("8000", () => console.log("Serveur serieux sur le port 8000"))
 //   );
-app.listen("8000", () => console.log("Serveur serieux sur le port 8000"));
+const port = process.env.PORT || 8000;
+app.listen(port, () => console.log(`Serveur serieux sur le port ${port}`));

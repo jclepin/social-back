@@ -48,6 +48,17 @@ app.use((err, req, rep, next) => {
   err ? rep.status(err.status).json({ error: err.message }) : next();
 });
 
+const tryCatch = (tryer) => {
+  try {
+    const result = tryer();
+    return [result, null];
+  } catch (error) {
+    return [null, error];
+  }
+};
+
+//   const [data, err] = tryCatch(() => getData(2));
+
 app.get("/", (req, res) => res.json({ Error: "GET not valid" }));
 
 app.post("/login", async (req, rep) => {
@@ -85,12 +96,21 @@ app.get("/posts", async (req, res) => {
   const posts = await knex("user")
     .join("publication", "user.id", "publication.user_id")
     .select("*");
-  res.json(posts);
+  const postsClean = posts.map((post) => {
+    delete post["hash"];
+    return post;
+  });
+
+  res.json(postsClean);
 });
 app.get("/users", async (req, res) => {
   const users = await knex("user").select("*");
-  console.log("🚀 ~ file: server.js ~ line 40 ~ app.get ~ users", users);
-  res.json(users);
+  const usersClean = users.map((user) => {
+    delete user["hash"];
+    return user;
+  });
+  //   console.log("🚀 ~ file: server.js ~ line 40 ~ app.get ~ users", users);
+  res.json(usersClean);
 });
 
 // sequelize

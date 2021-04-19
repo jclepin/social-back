@@ -85,7 +85,8 @@ app.post("/login", async (req, rep) => {
         }
       );
       await knex("user").update({ status: 1 }).where({ id: utilisateur.id });
-      rep.json({ token });
+      delete utilisateur["hash"];
+      rep.json({ token, user: utilisateur });
     } else {
       rep.status(403).json({ erreur: "non autorisé" });
     }
@@ -96,7 +97,8 @@ app.get("/posts", async (req, res) => {
   //   const posts = await knex("publication").select("*");
   const posts = await knex("user")
     .join("publication", "user.id", "publication.user_id")
-    .select("*");
+    .select("*")
+    .orderBy("publication.id", "desc");
   const postsClean = posts.map((post) => {
     delete post["hash"];
     return post;
@@ -117,11 +119,23 @@ app.get("/users", async (req, res) => {
   }
 });
 
+app.get("/me", async (req, res) => {
+  const me = await knex("user").select("id", "login").where("id", req.user.id);
+  res.json(me[0]);
+});
+
+app.post("/post", async (req, res) => {
+  if (req.body.titre.length > 0 && req.body.content.length > 0) {
+    const set = await knex("publication").insert({
+      ...req.body,
+      user_id: req.user.id,
+    });
+    res.json(set);
+  }
+  res.json({ info: "Rien à publier" });
+});
+
 app.get("/disconnect", async (req, res) => {
-  console.log(
-    "🚀 ~ file: server.js ~ line 121 ~ app.get ~ req.user.id",
-    req.user.id
-  );
   const reponse = await knex("user")
     .update({ status: 0 })
     .where({ id: req.user.id });

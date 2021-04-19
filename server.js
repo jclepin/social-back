@@ -40,12 +40,13 @@ app.use(
     secret: process.env.JWT_SECRET,
     algorithms: ["HS256"],
   }).unless({
-    path: ["/", "/posts", "/users", "/login"],
+    path: ["/", "/posts", "/login", "/resetStatus"],
   })
 );
 
 app.use((err, req, rep, next) => {
-  err ? rep.status(err.status).json({ error: err.message }) : next();
+  err ? rep.status(200).json({ error: err.message }) : next();
+  //   err ? rep.status(err.status).json({ error: err.message }) : next();
 });
 
 const tryCatch = (tryer) => {
@@ -71,23 +72,23 @@ app.post("/login", async (req, rep) => {
   if (!utilisateur) {
     rep.json({ erreur: "non autorisé" });
   } else {
-    compare(password, utilisateur.hash).then((same) => {
-      if (same) {
-        const token = jwt.sign(
-          {
-            login,
-            role: utilisateur.role,
-          },
-          SECRET,
-          {
-            expiresIn: "1h",
-          }
-        );
-        rep.json({ token });
-      } else {
-        rep.status(403).json({ erreur: "non autorisé" });
-      }
-    });
+    if (await compare(password, utilisateur.hash)) {
+      const token = jwt.sign(
+        {
+          id: utilisateur.id,
+          login,
+          role: utilisateur.role,
+        },
+        SECRET,
+        {
+          expiresIn: "1h",
+        }
+      );
+      await knex("user").update({ status: 1 }).where({ id: utilisateur.id });
+      rep.json({ token });
+    } else {
+      rep.status(403).json({ erreur: "non autorisé" });
+    }
   }
 });
 
@@ -104,15 +105,32 @@ app.get("/posts", async (req, res) => {
   res.json(postsClean);
 });
 app.get("/users", async (req, res) => {
-  const users = await knex("user").select("*");
-  const usersClean = users.map((user) => {
-    delete user["hash"];
-    return user;
-  });
-  //   console.log("🚀 ~ file: server.js ~ line 40 ~ app.get ~ users", users);
-  res.json(usersClean);
+  try {
+    const users = await knex("user").select("*");
+    const usersClean = users.map((user) => {
+      delete user["hash"];
+      return user;
+    });
+    res.json(usersClean);
+  } catch (e) {
+    console.log("🚀 ~ file: server.js ~ line 109 ~ app.get ~ e", e);
+  }
 });
 
+app.get("/disconnect", async (req, res) => {
+  console.log(
+    "🚀 ~ file: server.js ~ line 121 ~ app.get ~ req.user.id",
+    req.user.id
+  );
+  const reponse = await knex("user")
+    .update({ status: 0 })
+    .where({ id: req.user.id });
+  res.json({ reponse });
+});
+app.get("/resetStatus", async (req, res) => {
+  const reponse = await knex("user").update({ status: 0 }).where({ status: 1 });
+  res.json({ reponse });
+});
 // sequelize
 //   .sync()
 //   .then(() =>

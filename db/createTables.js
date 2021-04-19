@@ -8,19 +8,22 @@ const knex = require("knex")({
 (async () => {
   try {
     // Create a table
-    await knex.schema
-      .createTable("user", (table) => {
-        table.increments("id");
-        table.string("login");
-        table.string("hash");
-      })
-      // ...and another
-      .createTable("publication", (table) => {
-        table.increments("id");
-        table.string("titre");
-        table.string("content");
-        table.integer("user_id").unsigned().references("user.id");
-      });
+    await knex.schema.alterTable("user", (table) => {
+      table.boolean("status").defaultTo(false);
+    });
+    // await knex.schema
+    //   .createTable("user", (table) => {
+    //     table.increments("id");
+    //     table.string("login");
+    //     table.string("hash");
+    //   })
+    // ...and another
+    //   .createTable("publication", (table) => {
+    //     table.increments("id");
+    //     table.string("titre");
+    //     table.string("content");
+    //     table.integer("user_id").unsigned().references("user.id");
+    //   });
 
     //   // Then query the table...
     //   const insertedRows = await knex("users").insert({ user_name: "Tim" });

@@ -88,9 +88,39 @@ app.post("/login", async (req, rep) => {
       delete utilisateur["hash"];
       rep.json({ token, user: utilisateur });
     } else {
-      rep.status(403).json({ erreur: "non autorisé" });
+      rep
+        .status(200)
+        .json({ error: "Informations d'identification incorrects" });
     }
   }
+});
+app.get("/posts/me", async (req, res) => {
+  //   const posts = await knex("publication").select("*");
+  const posts = await knex("user")
+    .join("publication", "user.id", "publication.user_id")
+    .select("*")
+    .where("user.id", req.user.id)
+    .orderBy("publication.id", "desc");
+  const postsClean = posts.map((post) => {
+    delete post["hash"];
+    return post;
+  });
+
+  res.json(postsClean);
+});
+app.get("/posts/:id", async (req, res) => {
+  //   const posts = await knex("publication").select("*");
+  const posts = await knex("user")
+    .join("publication", "user.id", "publication.user_id")
+    .select("*")
+    .where("user.id", req.params.id)
+    .orderBy("publication.id", "desc");
+  const postsClean = posts.map((post) => {
+    delete post["hash"];
+    return post;
+  });
+
+  res.json(postsClean);
 });
 
 app.get("/posts", async (req, res) => {

@@ -40,12 +40,12 @@ app.use(
     secret: process.env.JWT_SECRET,
     algorithms: ["HS256"],
   }).unless({
-    path: ["/", "/posts", "/login", "/resetStatus"],
+    path: ["/", "/login", "/register"],
   })
 );
 
 app.use((err, req, rep, next) => {
-  err ? rep.status(200).json({ error: err.message }) : next();
+  err ? rep.status(err.status).json({ error: err.message }) : next();
   //   err ? rep.status(err.status).json({ error: err.message }) : next();
 });
 
@@ -62,6 +62,18 @@ const tryCatch = (tryer) => {
 
 app.get("/", (req, res) => res.json({ Error: "GET not valid" }));
 
+app.post("/register", async (req, res) => {
+  if (req.body.login === "" || req.body.password === "") {
+    res.status(400).json({ erreur: "login ou pass non fournis" });
+  } else {
+    const set = await knex("user").insert({
+      login: req.body.login,
+      hash: await hash(req.body.password),
+    });
+    res.json(set);
+  }
+});
+
 app.post("/login", async (req, rep) => {
   const { login, password } = req.body;
 
@@ -70,7 +82,9 @@ app.post("/login", async (req, rep) => {
     .select(`*`);
   utilisateur = utilisateur[0];
   if (!utilisateur) {
-    rep.json({ erreur: "non autorisé" });
+    rep
+      .status(403)
+      .json({ erreur: "Informations d'identification incorrects" });
   } else {
     if (await compare(password, utilisateur.hash)) {
       const token = jwt.sign(
@@ -84,13 +98,33 @@ app.post("/login", async (req, rep) => {
           expiresIn: "1h",
         }
       );
+
+      //status = 1
       await knex("user").update({ status: 1 }).where({ id: utilisateur.id });
       delete utilisateur["hash"];
-      rep.json({ token, user: utilisateur });
+
+      //friends
+      const friends = await knex("friend")
+        .join("user", "friend.user_id", "user.id")
+        .select("*")
+        .where("friend.user_id", utilisateur.id);
+      //   const friendsClean = friends
+      //     .filter((friend) => friend.id !== req.user.id)
+      //     .map((friend) => {
+      //       delete friend["hash"];
+      //       return friend;
+      //     });
+
+      console.log(
+        "🚀 ~ file: server.js ~ line 94 ~ app.post ~ friends",
+        friends
+      );
+
+      rep.json({ token, user: utilisateur, friends });
     } else {
       rep
-        .status(200)
-        .json({ error: "Informations d'identification incorrects" });
+        .status(403)
+        .json({ erreur: "Informations d'identification incorrects" });
     }
   }
 });
@@ -114,6 +148,7 @@ app.get("/posts/:id", async (req, res) => {
     .join("publication", "user.id", "publication.user_id")
     .select("*")
     .where("user.id", req.params.id)
+    .orWhere("parent_user_id", req.params.id)
     .orderBy("publication.id", "desc");
   const postsClean = posts.map((post) => {
     delete post["hash"];
@@ -139,10 +174,12 @@ app.get("/posts", async (req, res) => {
 app.get("/users", async (req, res) => {
   try {
     const users = await knex("user").select("*");
-    const usersClean = users.map((user) => {
-      delete user["hash"];
-      return user;
-    });
+    const usersClean = users
+      .filter((friend) => friend.id !== req.user.id)
+      .map((user) => {
+        delete user["hash"];
+        return user;
+      });
     res.json(usersClean);
   } catch (e) {
     console.log("🚀 ~ file: server.js ~ line 109 ~ app.get ~ e", e);
@@ -155,7 +192,11 @@ app.get("/me", async (req, res) => {
 });
 
 app.post("/post", async (req, res) => {
-  if (req.body.titre.length > 0 && req.body.content.length > 0) {
+  if (
+    ((req.body.titre != null && req.body.titre.length > 0) ||
+      req.body.parent) &&
+    req.body.content.length > 0
+  ) {
     const set = await knex("publication").insert({
       ...req.body,
       user_id: req.user.id,
@@ -163,6 +204,34 @@ app.post("/post", async (req, res) => {
     res.json(set);
   }
   res.json({ info: "Rien à publier" });
+});
+
+app.get("/friends", async (req, res) => {
+  const friends = await knex("friend")
+    .join("user", "friend.user_id", "user.id")
+    .select("*");
+  const friendsClean = friends
+    .filter((friend) => friend.id !== req.user.id)
+    .map((friend) => {
+      delete friend["hash"];
+      return friend;
+    });
+
+  res.json(friendsClean);
+});
+
+app.post("/friends", async (req, res) => {
+  const set = await knex("friend").insert([
+    {
+      user_id: req.body.id1,
+      friend_id: req.body.id2,
+    },
+    {
+      user_id: req.body.id2,
+      friend_id: req.body.id1,
+    },
+  ]);
+  res.json(set);
 });
 
 app.get("/disconnect", async (req, res) => {

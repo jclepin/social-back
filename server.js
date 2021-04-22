@@ -13,6 +13,7 @@ const compare = async (password, hash) => {
   return await bcrypt.compare(password, hash);
 };
 const jwt = require("jsonwebtoken");
+const { getFriends } = require("./actions/getFriends");
 // const Sequelize = require("sequelize");
 const knex = require("knex")({
   client: "sqlite3",
@@ -104,21 +105,7 @@ app.post("/login", async (req, rep) => {
       delete utilisateur["hash"];
 
       //friends
-      const friends = await knex("friend")
-        .join("user", "friend.user_id", "user.id")
-        .select("*")
-        .where("friend.user_id", utilisateur.id);
-      //   const friendsClean = friends
-      //     .filter((friend) => friend.id !== req.user.id)
-      //     .map((friend) => {
-      //       delete friend["hash"];
-      //       return friend;
-      //     });
-
-      console.log(
-        "🚀 ~ file: server.js ~ line 94 ~ app.post ~ friends",
-        friends
-      );
+      const friends = await getFriends(utilisateur.id);
 
       rep.json({ token, user: utilisateur, friends });
     } else {
@@ -163,6 +150,7 @@ app.get("/posts", async (req, res) => {
   const posts = await knex("user")
     .join("publication", "user.id", "publication.user_id")
     .select("*")
+    .where("public", 1)
     .orderBy("publication.id", "desc");
   const postsClean = posts.map((post) => {
     delete post["hash"];
@@ -188,7 +176,8 @@ app.get("/users", async (req, res) => {
 
 app.get("/me", async (req, res) => {
   const me = await knex("user").select("id", "login").where("id", req.user.id);
-  res.json(me[0]);
+  const friends = await getFriends(req.user.id);
+  res.json({ user: me[0], friends });
 });
 
 app.post("/post", async (req, res) => {
@@ -202,36 +191,33 @@ app.post("/post", async (req, res) => {
       user_id: req.user.id,
     });
     res.json(set);
+  } else {
+    res.json({ info: "Rien à publier" });
   }
-  res.json({ info: "Rien à publier" });
 });
 
 app.get("/friends", async (req, res) => {
-  const friends = await knex("friend")
-    .join("user", "friend.user_id", "user.id")
-    .select("*");
-  const friendsClean = friends
-    .filter((friend) => friend.id !== req.user.id)
-    .map((friend) => {
-      delete friend["hash"];
-      return friend;
-    });
+  //friends
+  const friends = await getFriends(req.user.id);
 
-  res.json(friendsClean);
+  res.json(friends);
 });
 
 app.post("/friends", async (req, res) => {
-  const set = await knex("friend").insert([
+  await knex("friend").insert([
     {
-      user_id: req.body.id1,
-      friend_id: req.body.id2,
+      user_id: req.user.id,
+      friend_id: req.body.friendId,
     },
     {
-      user_id: req.body.id2,
-      friend_id: req.body.id1,
+      user_id: req.body.friendId,
+      friend_id: req.user.id,
     },
   ]);
-  res.json(set);
+
+  const friends = await getFriends(req.user.id);
+
+  res.json({ friends });
 });
 
 app.get("/disconnect", async (req, res) => {

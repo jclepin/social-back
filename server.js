@@ -152,6 +152,7 @@ app.get("/posts", async (req, res) => {
     .select("*")
     .where("public", 1)
     .orderBy("publication.id", "desc");
+
   const postsClean = posts.map((post) => {
     delete post["hash"];
     return post;
@@ -182,17 +183,29 @@ app.get("/me", async (req, res) => {
 
 app.post("/post", async (req, res) => {
   if (
-    ((req.body.titre != null && req.body.titre.length > 0) ||
+    ((req.body.titre !== null && req.body.titre.length > 0) ||
       req.body.parent) &&
     req.body.content.length > 0
   ) {
-    const set = await knex("publication").insert({
+    await knex("publication").insert({
       ...req.body,
       user_id: req.user.id,
     });
-    res.json(set);
+
+    const posts = await knex("user")
+      .join("publication", "user.id", "publication.user_id")
+      .select("*")
+      .where("public", 1)
+      .orderBy("publication.id", "desc");
+
+    const postsClean = posts.map((post) => {
+      delete post["hash"];
+      return post;
+    });
+
+    res.json(postsClean);
   } else {
-    res.json({ info: "Rien à publier" });
+    res.status(403).json({ info: "Rien à publier" });
   }
 });
 

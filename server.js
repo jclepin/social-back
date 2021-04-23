@@ -205,7 +205,7 @@ app.post("/post", async (req, res) => {
 
     res.json(postsClean);
   } else {
-    res.status(403).json({ info: "Rien à publier" });
+    res.status(403).json({ erreur: "Rien à publier" });
   }
 });
 

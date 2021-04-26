@@ -26,24 +26,24 @@ const knex = require("knex")({
 
 const SECRET = process.env.JWT_SECRET;
 
-// var whitelist = [process.env.FRONT_URL, process.env.FRONT_URL_HEROKU];
-// const corsOptions = {
-//   origin: function (origin, callback) {
-//     if (whitelist.indexOf(origin) !== -1) {
-//       callback(null, true);
-//     } else {
-//       callback(new Error("Not allowed by CORS"));
-//     }
-//   },
-//   optionsSuccessStatus: 200,
-//   credentials: true,
-// };
-
+var whitelist = [process.env.FRONT_URL, process.env.FRONT_URL_HEROKU];
 const corsOptions = {
-  origin: process.env.FRONT_URL,
+  origin: function (origin, callback) {
+    if (whitelist.indexOf(origin) !== -1) {
+      callback(null, true);
+    } else {
+      callback(new Error("Not allowed by CORS"));
+    }
+  },
   optionsSuccessStatus: 200,
   credentials: true,
 };
+
+// const corsOptions = {
+//   origin: process.env.FRONT_URL,
+//   optionsSuccessStatus: 200,
+//   credentials: true,
+// };
 
 app = express();
 app.use(express.json());

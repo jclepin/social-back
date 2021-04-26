@@ -1,5 +1,6 @@
 require("dotenv").config();
 const express = require("express");
+const cookieParser = require("cookie-parser");
 const cors = require("cors");
 const jwtMiddelware = require("express-jwt");
 const bcrypt = require("bcrypt");
@@ -26,7 +27,6 @@ const knex = require("knex")({
 const SECRET = process.env.JWT_SECRET;
 
 var whitelist = [process.env.FRONT_URL, process.env.FRONT_URL_HEROKU];
-
 const corsOptions = {
   origin: function (origin, callback) {
     if (whitelist.indexOf(origin) !== -1) {
@@ -35,8 +35,15 @@ const corsOptions = {
       callback(new Error("Not allowed by CORS"));
     }
   },
-  optionsSuccessStatus: 200, // some legacy browsers (IE11, various SmartTVs) choke on 204
+  optionsSuccessStatus: 200,
+  credentials: true,
 };
+
+// const corsOptions = {
+//   origin: process.env.FRONT_URL,
+//   optionsSuccessStatus: 200,
+//   credentials: true,
+// };
 
 app = express();
 app.use(express.json());
@@ -45,9 +52,11 @@ app.use(cors(corsOptions));
 // const sequelize = new Sequelize("sqlite:database.db");
 
 app.use(
+  cookieParser(),
   jwtMiddelware({
     secret: process.env.JWT_SECRET,
     algorithms: ["HS256"],
+    getToken: (req) => req.cookies.token,
   }).unless({
     path: ["/", "/login", "/register"],
   })
@@ -83,7 +92,7 @@ app.post("/register", async (req, res) => {
   }
 });
 
-app.post("/login", async (req, rep) => {
+app.post("/login", async (req, res) => {
   const { login, password } = req.body;
 
   let utilisateur = await knex("user")
@@ -91,7 +100,7 @@ app.post("/login", async (req, rep) => {
     .select(`*`);
   utilisateur = utilisateur[0];
   if (!utilisateur) {
-    rep
+    res
       .status(403)
       .json({ erreur: "Informations d'identification incorrects" });
   } else {
@@ -115,14 +124,35 @@ app.post("/login", async (req, rep) => {
       //friends
       const friends = await getFriends(utilisateur.id);
 
-      rep.json({ token, user: utilisateur, friends });
+      res.cookie("token", token, {
+        httpOnly: true,
+        secure: true,
+        expires: new Date(Date.now() + 604800000),
+        // domain: "http://localhost:8000",
+      });
+
+      res.json({ user: utilisateur, friends });
     } else {
-      rep
+      res
         .status(403)
         .json({ erreur: "Informations d'identification incorrects" });
     }
   }
 });
+
+// app.get("/cookie", (req, rep) => {
+//   try {
+//     rep.cookie("token", "lesupertoken", {
+//       httpOnly: true,
+//       secure: false,
+//       domain: "http://localhost:3000",
+//     });
+//     rep.json("cookie send");
+//   } catch (e) {
+//     rep.status(403).json("not send");
+//   }
+// });
+
 app.get("/posts/me", async (req, res) => {
   //   const posts = await knex("publication").select("*");
   const posts = await knex("user")
@@ -168,6 +198,7 @@ app.get("/posts", async (req, res) => {
 
   res.json(postsClean);
 });
+
 app.get("/users", async (req, res) => {
   try {
     const users = await knex("user").select("*");
@@ -185,6 +216,7 @@ app.get("/users", async (req, res) => {
 
 app.get("/me", async (req, res) => {
   const me = await knex("user").select("id", "login").where("id", req.user.id);
+  //   console.log("🚀 ~ file: server.js ~ line 221 ~ app.get ~ me", me);
   const friends = await getFriends(req.user.id);
   res.json({ user: me[0], friends });
 });
@@ -245,6 +277,7 @@ app.get("/disconnect", async (req, res) => {
   const reponse = await knex("user")
     .update({ status: 0 })
     .where({ id: req.user.id });
+  res.cookie("token", null);
   res.json({ reponse });
 });
 app.get("/resetStatus", async (req, res) => {

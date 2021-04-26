@@ -127,6 +127,7 @@ app.post("/login", async (req, res) => {
       res.cookie("token", token, {
         httpOnly: true,
         secure: true,
+        sameSite: "none",
         expires: new Date(Date.now() + 604800000),
         // domain: "http://localhost:8000",
       });
